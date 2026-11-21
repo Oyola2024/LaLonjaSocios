@@ -1,0 +1,186 @@
+{% extends 'base.html' %}
+{% load l10n %}
+
+{% block contenido %}
+      <div id="vista-lista">
+
+        <!-- Resumen -->
+        <section class="grid grid-cols-3 gap-3 mb-4">
+            <button type="button" data-filtro="" class="resumen rounded-xl bg-white p-4 text-left shadow-sm ring-1 ring-stone-200 hover:ring-stone-400">
+                <p class="text-sm text-stone-600">Socios</p>
+                <p id="resumen-total" class="text-3xl font-extrabold">–</p>
+            </button>
+            <button type="button" data-filtro="al_dia" class="resumen rounded-xl bg-white p-4 text-left shadow-sm ring-1 ring-stone-200 hover:ring-green-500">
+                <p class="text-sm text-green-700">Al día</p>
+                <p id="resumen-al-dia" class="text-3xl font-extrabold text-green-700">–</p>
+            </button>
+            <button type="button" data-filtro="moroso" class="resumen rounded-xl bg-white p-4 text-left shadow-sm ring-1 ring-stone-200 hover:ring-red-500">
+                <p class="text-sm text-red-700">Deben cuota</p>
+                <p id="resumen-morosos" class="text-3xl font-extrabold text-red-700">–</p>
+            </button>
+        </section>
+
+        <p class="mb-4 rounded-lg bg-amber-50 px-4 py-2 text-amber-900 ring-1 ring-amber-200">
+            La cuota vence el <strong>día {{ dia_vencimiento }} de cada mes</strong>. Después de esa fecha, quien no pagó figura como "Debe cuota".
+        </p>
+
+        <!-- Buscador -->
+        <section class="flex flex-col sm:flex-row gap-3 mb-3">
+            <input id="buscador" type="search" placeholder="Buscar por nombre, apellido o DNI..."
+                   class="flex-1 rounded-lg border border-stone-300 bg-white px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+        </section>
+
+        <!-- Pestañas -->
+        <nav class="flex gap-2 mb-4" id="pestanas">
+            <button type="button" data-filtro="" class="pestana rounded-full px-4 py-2 font-semibold">Todos</button>
+            <button type="button" data-filtro="al_dia" class="pestana rounded-full px-4 py-2 font-semibold">Al día</button>
+            <button type="button" data-filtro="moroso" class="pestana rounded-full px-4 py-2 font-semibold">Deben cuota</button>
+            <button type="button" data-filtro="inactivo" class="pestana rounded-full px-4 py-2 font-semibold">Inactivos</button>
+        </nav>
+
+        <!-- Lista de socios -->
+        <section id="lista" class="space-y-3"></section>
+
+        <!-- Paginación -->
+        <nav id="paginacion" class="mt-6 flex items-center justify-center gap-4"></nav>
+      </div>
+
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        const API = '/api/socios/';
+        const MONTO_CUOTA = {{ monto_cuota|unlocalize }};
+
+        const estado = { pagina: 1, filtro: '', texto: '', total: 0, tamano: 20 };
+
+        // ---------- Lista ----------
+        function insigniaEstado(s) {
+            if (s.estado === 'inactivo') return '<span class="inline-block rounded-full bg-stone-200 px-3 py-1 text-sm font-bold text-stone-700">Inactivo</span>';
+            if (s.estado === 'moroso') return '<span class="inline-block rounded-full bg-red-100 px-3 py-1 text-sm font-bold text-red-800">Debe cuota</span>';
+            return '<span class="inline-block rounded-full bg-green-100 px-3 py-1 text-sm font-bold text-green-800">Al día ✓</span>';
+        }
+
+        function detalleEstado(s) {
+            if (s.estado === 'inactivo') return '<p class="text-stone-600">Socio dado de baja (se conserva su historial)</p>';
+            if (s.estado === 'moroso') return `<p class="text-red-800">Debe: ${esc(s.meses_adeudados.join(', '))}</p>`;
+            return `<p class="text-stone-600">Próxima cuota: ${esc(s.proximo_mes_a_pagar)}</p>`;
+        }
+
+        function tarjetaSocio(s) {
+            const debe = s.estado === 'moroso';
+            const insignia = insigniaEstado(s);
+            const detalle = detalleEstado(s);
+            const ultimo = s.ultimo_pago
+                ? `Último pago: ${fechaCorta(s.ultimo_pago)}`
+                : 'Todavía no registra pagos';
+            const whatsapp = debe && s.link_whatsapp
+                ? `<a href="${esc(s.link_whatsapp)}" target="_blank" rel="noopener"
+                      class="rounded-lg bg-green-600 px-4 py-2 font-bold text-white hover:bg-green-700">Avisar por WhatsApp</a>`
+                : '';
+            return `
+            <article class="rounded-xl bg-white p-4 shadow-sm ring-1 ${debe ? 'ring-red-200' : 'ring-stone-200'}">
+                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div class="space-y-1">
+                        <div class="flex flex-wrap items-center gap-3">
+                            <h3 class="text-xl font-bold">${esc(s.apellido)}, ${esc(s.nombre)}</h3>
+                            ${insignia}
+                        </div>
+                        <p class="text-stone-600">DNI ${esc(s.dni)} · WhatsApp ${esc(s.telefono)}</p>
+                        ${detalle}
+                        <p class="text-sm text-stone-500">${ultimo}</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2" data-id="${s.id}">
+                        ${whatsapp}
+                    </div>
+                </div>
+            </article>`;
+        }
+
+        let socios = [];
+
+        async function cargarLista() {
+            const params = new URLSearchParams({ page: estado.pagina });
+            if (estado.filtro) params.set('estado', estado.filtro);
+            if (estado.texto) params.set('search', estado.texto);
+            const lista = $('lista');
+            try {
+                const datos = await pedir(`${API}?${params}`);
+                socios = datos.results;
+                estado.total = datos.count;
+                lista.innerHTML = socios.length
+                    ? socios.map(tarjetaSocio).join('')
+                    : `<div class="rounded-xl bg-white p-8 text-center text-lg text-stone-600 ring-1 ring-stone-200">
+                           ${estado.texto || estado.filtro ? 'No hay socios que coincidan con la búsqueda.' : 'Todavía no hay socios cargados. Usá el botón "+ Nuevo socio".'}
+                       </div>`;
+                dibujarPaginacion();
+            } catch (error) {
+                // Si se borró el último socio de la última página, volver a la anterior
+                if (error.estado === 404 && estado.pagina > 1) {
+                    estado.pagina -= 1;
+                    return cargarLista();
+                }
+                lista.innerHTML = `<div class="rounded-xl bg-red-50 p-6 text-red-800">${esc(mensajeDeError(error))}</div>`;
+            }
+        }
+
+        function dibujarPaginacion() {
+            const paginas = Math.max(1, Math.ceil(estado.total / estado.tamano));
+            const nav = $('paginacion');
+            if (paginas === 1) { nav.innerHTML = ''; return; }
+            const estilo = 'rounded-lg border border-stone-300 bg-white px-4 py-2 font-semibold hover:bg-stone-100 disabled:opacity-40';
+            nav.innerHTML = `
+                <button type="button" id="pag-ant" class="${estilo}" ${estado.pagina <= 1 ? 'disabled' : ''}>← Anterior</button>
+                <span>Página ${estado.pagina} de ${paginas}</span>
+                <button type="button" id="pag-sig" class="${estilo}" ${estado.pagina >= paginas ? 'disabled' : ''}>Siguiente →</button>`;
+            $('pag-ant').onclick = () => { estado.pagina -= 1; cargarLista(); };
+            $('pag-sig').onclick = () => { estado.pagina += 1; cargarLista(); };
+        }
+
+        async function cargarResumen() {
+            try {
+                const r = await pedir(`${API}resumen/`);
+                $('resumen-total').textContent = r.total;
+                $('resumen-al-dia').textContent = r.al_dia;
+                $('resumen-morosos').textContent = r.morosos;
+            } catch (error) { /* la lista ya muestra el error */ }
+        }
+
+        function actualizarTodo() {
+            cargarLista();
+            cargarResumen();
+        }
+
+        function marcarPestana() {
+            document.querySelectorAll('.pestana').forEach((b) => {
+                const activa = b.dataset.filtro === estado.filtro;
+                b.className = 'pestana rounded-full px-4 py-2 font-semibold ' +
+                    (activa ? 'bg-stone-900 text-white' : 'bg-white text-stone-700 ring-1 ring-stone-300 hover:bg-stone-200');
+            });
+        }
+
+        function elegirFiltro(filtro) {
+            estado.filtro = filtro;
+            estado.pagina = 1;
+            marcarPestana();
+            cargarLista();
+        }
+
+        document.querySelectorAll('.pestana, .resumen').forEach((b) =>
+            b.addEventListener('click', () => elegirFiltro(b.dataset.filtro)));
+
+        let temporizadorBusqueda;
+        $('buscador').addEventListener('input', (e) => {
+            clearTimeout(temporizadorBusqueda);
+            temporizadorBusqueda = setTimeout(() => {
+                estado.texto = e.target.value.trim();
+                estado.pagina = 1;
+                cargarLista();
+            }, 300);
+        });
+
+        marcarPestana();
+        cargarLista();
+        cargarResumen();
+    </script>
+{% endblock %}
