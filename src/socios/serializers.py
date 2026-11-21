@@ -20,6 +20,7 @@ class SocioSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
     def validate_telefono(self, value):
+        # Se guardan solo los números: "358 412-3456" -> "3584123456"
         digitos = ''.join(c for c in value if c.isdigit())
         if not 8 <= len(digitos) <= 15:
             raise serializers.ValidationError('Ingresá un teléfono válido, con código de área y sin el 15.')
@@ -32,6 +33,7 @@ class SocioEstadoSerializer(serializers.ModelSerializer):
     proximo_mes_a_pagar = serializers.SerializerMethodField()
     proximo_periodo = serializers.SerializerMethodField()
     ultimo_pago = serializers.SerializerMethodField()
+    link_whatsapp = serializers.SerializerMethodField()
 
     class Meta:
         model = Socio
@@ -50,6 +52,7 @@ class SocioEstadoSerializer(serializers.ModelSerializer):
             'proximo_mes_a_pagar',
             'proximo_periodo',
             'ultimo_pago',
+            'link_whatsapp',
         ]
 
         read_only_fields = ['id']
@@ -72,6 +75,9 @@ class SocioEstadoSerializer(serializers.ModelSerializer):
     def get_ultimo_pago(self, socio) -> str | None:
         pago = socio.ultimo_pago()
         return pago.fecha_pago.isoformat() if pago else None
+
+    def get_link_whatsapp(self, socio) -> str | None:
+        return socio.link_whatsapp()
 
 
 class PagoSerializer(serializers.ModelSerializer):
