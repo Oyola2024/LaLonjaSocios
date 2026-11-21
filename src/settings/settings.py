@@ -12,7 +12,6 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -21,7 +20,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-k#mq@e3+@6fu&42#zy)o^^u5*p3snj1p&aw4gw(x87mqmh9!w$'
+SECRET_KEY = 'django-insecure-lalonja-4k#9v!q2x7m@c8r1t$z6p0w_h5y3n^e&b+d*u-j'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -91,7 +90,6 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 20,
 }
 
-
 SPECTACULAR_SETTINGS = {
     'TITLE': 'La Lonja API',
     'DESCRIPTION': 'API para la gestión de socios y cuotas del club',
@@ -103,6 +101,12 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
+
+# Cuotas del club
+# Día del mes en que vence la cuota social
+DIA_VENCIMIENTO = 3
+# Valor de la cuota mensual en pesos (se puede cambiar al registrar cada pago)
+MONTO_CUOTA = 5000
 
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
@@ -150,13 +154,3 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = 'static/'
-
-
-# Email
-# https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
-
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
-}
