@@ -111,6 +111,46 @@
         </form>
     </dialog>
 
+    <!-- Registrar pago -->
+    <dialog id="dlg-pago" class="w-full max-w-md rounded-2xl p-0 shadow-2xl backdrop:bg-black/50">
+        <form id="form-pago" class="p-6 space-y-4">
+            <h2 class="text-2xl font-extrabold">Registrar pago</h2>
+            <p id="texto-pago" class="text-lg"></p>
+            <div class="grid grid-cols-2 gap-4">
+                <label class="block">
+                    <span class="font-semibold">Mes que paga</span>
+                    <select id="mes-pago" class="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-lg"></select>
+                </label>
+                <label class="block">
+                    <span class="font-semibold">Año</span>
+                    <input id="anio-pago" type="number" min="2000" max="2100" required
+                           class="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 text-lg">
+                </label>
+            </div>
+            <label class="block">
+                <span class="font-semibold">Fecha en que pagó</span>
+                <input id="fecha-pago" type="date" required class="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 text-lg">
+            </label>
+            <label class="block">
+                <span class="font-semibold">Forma de pago</span>
+                <select id="forma-pago" class="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-lg">
+                    <option value="efectivo">Efectivo</option>
+                    <option value="transferencia">Transferencia</option>
+                </select>
+            </label>
+            <label class="block">
+                <span class="font-semibold">Monto cobrado ($)</span>
+                <input id="monto-pago" type="number" min="0" step="0.01" required
+                       class="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 text-lg">
+            </label>
+            <p id="error-pago" class="hidden rounded-lg bg-red-50 px-3 py-2 text-red-800"></p>
+            <div class="flex justify-end gap-3 pt-2">
+                <button type="button" data-cerrar class="rounded-lg border border-stone-300 px-5 py-3 font-semibold hover:bg-stone-100">Cancelar</button>
+                <button type="submit" class="rounded-lg bg-green-600 px-6 py-3 font-bold text-white hover:bg-green-700">Confirmar pago</button>
+            </div>
+        </form>
+    </dialog>
+
 {% endblock %}
 
 {% block scripts %}
@@ -136,6 +176,7 @@
 
         function tarjetaSocio(s) {
             const debe = s.estado === 'moroso';
+            const inactivo = s.estado === 'inactivo';
             const insignia = insigniaEstado(s);
             const detalle = detalleEstado(s);
             const ultimo = s.ultimo_pago
@@ -159,6 +200,7 @@
                     </div>
                     <div class="flex flex-wrap gap-2" data-id="${s.id}">
                         ${whatsapp}
+                        ${inactivo ? '' : '<button type="button" data-accion="pagar" class="rounded-lg border-2 border-green-600 px-4 py-2 font-bold text-green-700 hover:bg-green-50">Registrar pago</button>'}
                         <button type="button" data-accion="editar" class="rounded-lg border border-stone-300 px-4 py-2 font-semibold hover:bg-stone-100">Editar</button>
                     </div>
                 </div>
@@ -255,6 +297,7 @@
             socioActual = socios.find((s) => s.id === id);
             if (!socioActual) return;
             if (boton.dataset.accion === 'editar') abrirFormulario(socioActual);
+            if (boton.dataset.accion === 'pagar') abrirPago(socioActual);
         });
 
         document.querySelectorAll('[data-cerrar]').forEach((b) =>
@@ -322,6 +365,42 @@
                 }
             } finally {
                 boton.disabled = false;
+            }
+        });
+
+        // ---------- Registrar pago ----------
+        $('mes-pago').innerHTML = MESES.map((m, i) => `<option value="${i + 1}">${m}</option>`).join('');
+
+        function abrirPago(socio) {
+            $('error-pago').classList.add('hidden');
+            $('texto-pago').innerHTML =
+                `Pago de <strong>${esc(socio.nombre)} ${esc(socio.apellido)}</strong>. Se sugiere la cuota de ${esc(socio.proximo_mes_a_pagar)}.`;
+            $('mes-pago').value = socio.proximo_periodo.mes;
+            $('anio-pago').value = socio.proximo_periodo.anio;
+            $('fecha-pago').value = hoyIso();
+            $('forma-pago').value = 'efectivo';
+            $('monto-pago').value = MONTO_CUOTA;
+            $('dlg-pago').showModal();
+        }
+
+        $('form-pago').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                const cuerpo = {
+                    mes: Number($('mes-pago').value),
+                    anio: Number($('anio-pago').value),
+                    fecha_pago: $('fecha-pago').value,
+                    forma_pago: $('forma-pago').value,
+                    monto: $('monto-pago').value,
+                };
+                await pedir(`${API}${socioActual.id}/pagar/`, { method: 'POST', body: JSON.stringify(cuerpo) });
+                $('dlg-pago').close();
+                avisar(`Pago registrado: ${MESES[cuerpo.mes - 1]} ${cuerpo.anio}, ${plata(cuerpo.monto)}.`);
+                actualizarTodo();
+            } catch (error) {
+                const caja = $('error-pago');
+                caja.textContent = mensajeDeError(error);
+                caja.classList.remove('hidden');
             }
         });
 
