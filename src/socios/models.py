@@ -22,16 +22,6 @@ MESES = [
 def hoy():
     return timezone.localdate()
 
-def mes_siguiente(anio, mes):
-    return (anio + 1, 1) if mes == 12 else (anio, mes + 1)
-
-
-def mes_anterior(anio, mes):
-    return (anio - 1, 12) if mes == 1 else (anio, mes - 1)
-
-
-def nombre_periodo(anio, mes):
-    return f"{dict(MESES)[mes]} {anio}"
 
 class Socio(models.Model):
     nombre = models.CharField(max_length=100)
@@ -49,9 +39,17 @@ class Socio(models.Model):
     email = models.EmailField(blank=True, null=True)
     direccion = models.CharField(max_length=200, blank=True, null=True)
     fecha_alta = models.DateField(default=hoy)
+    # Se destilda cuando el socio se da de baja pero se quiere conservar su historial
+    activo = models.BooleanField(default=True)
 
     def __str__(self):
         return f"{self.nombre} {self.apellido}"
+
+
+FORMAS_DE_PAGO = [
+    ('efectivo', 'Efectivo'),
+    ('transferencia', 'Transferencia'),
+]
 
 
 class Pago(models.Model):
@@ -60,6 +58,7 @@ class Pago(models.Model):
     anio = models.PositiveSmallIntegerField()
     monto = models.DecimalField(max_digits=10, decimal_places=2)
     fecha_pago = models.DateField(default=hoy)
+    forma_pago = models.CharField(max_length=20, choices=FORMAS_DE_PAGO, default='efectivo')
 
     class Meta:
         ordering = ['-anio', '-mes']
