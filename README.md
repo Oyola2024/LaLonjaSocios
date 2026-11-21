@@ -146,7 +146,7 @@ Si se da de baja a un socio, también se borran sus pagos (`on_delete=CASCADE`).
 **1. Clonar el repositorio**
 
 ```bash
-git clone <URL-DEL-REPOSITORIO>
+git clone https://github.com/Oyola2024/LaLonjaSocios
 cd lalonja
 ```
 
