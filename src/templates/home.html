@@ -151,6 +151,19 @@
         </form>
     </dialog>
 
+    <!-- Confirmar baja -->
+    <dialog id="dlg-baja" class="w-full max-w-md rounded-2xl p-0 shadow-2xl backdrop:bg-black/50">
+        <form id="form-baja" class="p-6 space-y-4">
+            <h2 class="text-2xl font-extrabold">Eliminar al socio</h2>
+            <p id="texto-baja" class="text-lg"></p>
+            <p class="text-sm text-stone-600">Se borran también todos sus pagos registrados y no se puede deshacer. Si solo querés que deje de figurar como deudor, mejor editalo y destildá "Socio activo".</p>
+            <div class="flex justify-end gap-3 pt-2">
+                <button type="button" data-cerrar class="rounded-lg border border-stone-300 px-5 py-3 font-semibold hover:bg-stone-100">No, volver</button>
+                <button type="submit" class="rounded-lg bg-red-600 px-6 py-3 font-bold text-white hover:bg-red-700">Sí, eliminar</button>
+            </div>
+        </form>
+    </dialog>
+
 {% endblock %}
 
 {% block scripts %}
@@ -202,6 +215,7 @@
                         ${whatsapp}
                         ${inactivo ? '' : '<button type="button" data-accion="pagar" class="rounded-lg border-2 border-green-600 px-4 py-2 font-bold text-green-700 hover:bg-green-50">Registrar pago</button>'}
                         <button type="button" data-accion="editar" class="rounded-lg border border-stone-300 px-4 py-2 font-semibold hover:bg-stone-100">Editar</button>
+                        <button type="button" data-accion="baja" class="rounded-lg border border-red-300 px-4 py-2 font-semibold text-red-700 hover:bg-red-50">Eliminar</button>
                     </div>
                 </div>
             </article>`;
@@ -298,6 +312,7 @@
             if (!socioActual) return;
             if (boton.dataset.accion === 'editar') abrirFormulario(socioActual);
             if (boton.dataset.accion === 'pagar') abrirPago(socioActual);
+            if (boton.dataset.accion === 'baja') abrirBaja(socioActual);
         });
 
         document.querySelectorAll('[data-cerrar]').forEach((b) =>
@@ -401,6 +416,26 @@
                 const caja = $('error-pago');
                 caja.textContent = mensajeDeError(error);
                 caja.classList.remove('hidden');
+            }
+        });
+
+        // ---------- Dar de baja ----------
+        function abrirBaja(socio) {
+            $('texto-baja').innerHTML =
+                `¿Seguro que querés dar de baja a <strong>${esc(socio.nombre)} ${esc(socio.apellido)}</strong> (DNI ${esc(socio.dni)})?`;
+            $('dlg-baja').showModal();
+        }
+
+        $('form-baja').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                await pedir(`${API}${socioActual.id}/`, { method: 'DELETE' });
+                $('dlg-baja').close();
+                avisar('Socio eliminado.');
+                actualizarTodo();
+            } catch (error) {
+                $('dlg-baja').close();
+                avisar(mensajeDeError(error));
             }
         });
 
