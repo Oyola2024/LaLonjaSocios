@@ -28,6 +28,13 @@ from .serializers import (
     IngresosSerializer,
 )
 
+from django.http import HttpResponse
+
+def home(request):
+    return HttpResponse("Inicio")
+
+def ingresos(request):
+    return HttpResponse("Ingresos")
 
 @extend_schema_view(
     list=extend_schema(

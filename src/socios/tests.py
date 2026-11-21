@@ -349,3 +349,53 @@ class ExportarExcelTests(APITestCase):
     def test_requiere_login(self):
         self.client.force_authenticate(None)
         self.assertIn(self.client.get('/api/socios/exportar/').status_code, (401, 403))
+
+
+class IngresosTests(APITestCase):
+    def setUp(self):
+        self.usuario = User.objects.create_user('secretaria', password='clave12345', is_staff=True)
+        self.client.force_authenticate(self.usuario)
+        self.socio = crear_socio()
+
+    def cobrar(self, mes, anio, fecha, monto, forma='efectivo'):
+        return Pago.objects.create(socio=self.socio, mes=mes, anio=anio, monto=monto,
+                                   fecha_pago=fecha, forma_pago=forma)
+
+    def test_suma_por_mes_de_cobro_y_forma_de_pago(self):
+        # La cuota de septiembre se cobró en octubre: cuenta como ingreso de octubre
+        self.cobrar(9, 2026, date(2026, 10, 2), 10000, 'transferencia')
+        self.cobrar(10, 2026, date(2026, 10, 20), 5000, 'efectivo')
+        self.cobrar(11, 2026, date(2026, 11, 3), 7000, 'efectivo')
+        respuesta = self.client.get('/api/pagos/ingresos/?anio=2026')
+        self.assertEqual(respuesta.status_code, 200)
+        datos = respuesta.data
+        self.assertEqual(len(datos['meses']), 12)
+        octubre = datos['meses'][9]
+        self.assertEqual((octubre['mes_nombre'], octubre['cantidad']), ('Octubre', 2))
+        self.assertEqual(float(octubre['total']), 15000)
+        self.assertEqual(float(octubre['transferencia']), 10000)
+        self.assertEqual(float(octubre['efectivo']), 5000)
+        self.assertEqual(float(datos['meses'][10]['total']), 7000)
+        self.assertEqual(float(datos['meses'][0]['total']), 0)
+        self.assertEqual(float(datos['total']), 22000)
+        self.assertEqual(datos['cantidad'], 3)
+
+    def test_filtra_por_anio_y_lista_los_anios_disponibles(self):
+        self.cobrar(12, 2025, date(2025, 12, 5), 4000)
+        self.cobrar(1, 2026, date(2026, 1, 5), 6000)
+        datos = self.client.get('/api/pagos/ingresos/?anio=2025').data
+        self.assertEqual(float(datos['total']), 4000)
+        self.assertIn(2026, datos['anios'])
+        self.assertIn(2025, datos['anios'])
+
+    def test_sin_anio_usa_el_actual(self):
+        with con_fecha(2026, 11, 19):
+            datos = self.client.get('/api/pagos/ingresos/').data
+        self.assertEqual(datos['anio'], 2026)
+
+    def test_anio_invalido(self):
+        self.assertEqual(self.client.get('/api/pagos/ingresos/?anio=abc').status_code, 400)
+
+    def test_requiere_login(self):
+        self.client.force_authenticate(None)
+        self.assertIn(self.client.get('/api/pagos/ingresos/').status_code, (401, 403))
