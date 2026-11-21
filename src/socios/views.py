@@ -1,4 +1,7 @@
+from io import BytesIO
+
 from django.conf import settings
+from django.http import HttpResponse
 from .models import Socio, Pago, hoy, nombre_periodo
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
@@ -6,6 +9,9 @@ from rest_framework.response import Response
 from rest_framework import viewsets, status
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+from openpyxl import Workbook
+from openpyxl.styles import Font
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiResponse
 
 
@@ -25,6 +31,7 @@ def home(request):
 
 def ingresos(request):
     return HttpResponse("Ingresos")
+
 
 @extend_schema_view(
     list=extend_schema(
@@ -55,9 +62,9 @@ class SocioViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         estado = self.request.query_params.get('estado') if self.request else None
-        if self.action == 'list' and estado == 'inactivo':
+        if self.action in ('list', 'exportar') and estado == 'inactivo':
             queryset = queryset.filter(activo=False)
-        elif self.action == 'list' and estado in ('al_dia', 'moroso'):
+        elif self.action in ('list', 'exportar') and estado in ('al_dia', 'moroso'):
             # El estado se calcula con los pagos, por eso se filtra en Python
             activos = queryset.filter(activo=True)
             ids = [socio.id for socio in activos if socio.al_dia == (estado == 'al_dia')]
@@ -89,6 +96,65 @@ class SocioViewSet(viewsets.ModelViewSet):
             'morosos': len(activos) - al_dia,
             'inactivos': len(socios) - len(activos),
         })
+
+    @extend_schema(
+        summary="Descargar los socios en Excel",
+        description="Archivo .xlsx con los socios. Respeta los mismos filtros que el listado (estado, search).",
+        parameters=[
+            OpenApiParameter('estado', str, enum=['al_dia', 'moroso', 'inactivo']),
+        ],
+        responses={
+            (200, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'): OpenApiTypes.BINARY,
+        },
+    )
+    @action(detail=False, methods=['get'])
+    def exportar(self, request):
+        socios = self.filter_queryset(self.get_queryset())
+
+        libro = Workbook()
+        hoja = libro.active
+        hoja.title = 'Socios'
+        hoja.append([
+            'Apellido', 'Nombre', 'DNI', 'WhatsApp', 'Email', 'Dirección',
+            'Fecha de alta', 'Estado', 'Meses adeudados', 'Último pago',
+        ])
+        for celda in hoja[1]:
+            celda.font = Font(bold=True)
+
+        estados = {'al_dia': 'Al día', 'moroso': 'Debe cuota', 'inactivo': 'Inactivo'}
+        for socio in socios:
+            if not socio.activo:
+                estado = 'inactivo'
+            else:
+                estado = 'al_dia' if socio.al_dia else 'moroso'
+            pago = socio.ultimo_pago()
+            hoja.append([
+                socio.apellido,
+                socio.nombre,
+                socio.dni,
+                socio.telefono,
+                socio.email or '',
+                socio.direccion or '',
+                socio.fecha_alta,
+                estados[estado],
+                ', '.join(nombre_periodo(anio, mes) for anio, mes in socio.meses_adeudados()),
+                pago.fecha_pago if pago else '',
+            ])
+
+        for columna, ancho in zip('ABCDEFGHIJ', (18, 18, 12, 16, 28, 28, 14, 14, 36, 14)):
+            hoja.column_dimensions[columna].width = ancho
+        for fila in hoja.iter_rows(min_row=2):
+            fila[6].number_format = 'DD/MM/YYYY'
+            fila[9].number_format = 'DD/MM/YYYY'
+
+        archivo = BytesIO()
+        libro.save(archivo)
+        respuesta = HttpResponse(
+            archivo.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        respuesta['Content-Disposition'] = f'attachment; filename="socios-{hoy().isoformat()}.xlsx"'
+        return respuesta
 
     @extend_schema(
         summary="Registrar el pago de una cuota",
