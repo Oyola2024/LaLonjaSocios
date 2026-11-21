@@ -311,3 +311,41 @@ class HistorialYSociosInactivosTests(APITestCase):
         pago = pagar(socio, 2026, 9)
         self.assertEqual(self.client.delete(f'/api/pagos/{pago.id}/').status_code, 204)
         self.assertEqual(Pago.objects.count(), 0)
+
+
+class ExportarExcelTests(APITestCase):
+    def setUp(self):
+        self.usuario = User.objects.create_user('secretaria', password='clave12345', is_staff=True)
+        self.client.force_authenticate(self.usuario)
+
+    def leer(self, respuesta):
+        from io import BytesIO
+        from openpyxl import load_workbook
+        return list(load_workbook(BytesIO(respuesta.content)).active.values)
+
+    def test_descarga_un_excel_con_los_socios(self):
+        crear_socio()
+        with con_fecha(2026, 11, 19):
+            respuesta = self.client.get('/api/socios/exportar/')
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn('.xlsx', respuesta['Content-Disposition'])
+        filas = self.leer(respuesta)
+        self.assertEqual(filas[0][0], 'Apellido')
+        self.assertEqual(filas[1][:4], ('Pérez', 'Juan', '30111222', '3584123456'))
+        self.assertEqual(filas[1][7], 'Debe cuota')
+        self.assertEqual(filas[1][8], 'Septiembre 2026, Octubre 2026, Noviembre 2026')
+
+    def test_respeta_el_filtro_de_estado(self):
+        crear_socio()
+        al_dia = crear_socio(dni='20999888', nombre='María')
+        for mes in (9, 10, 11):
+            pagar(al_dia, 2026, mes)
+        with con_fecha(2026, 11, 19):
+            respuesta = self.client.get('/api/socios/exportar/?estado=al_dia')
+        filas = self.leer(respuesta)
+        self.assertEqual(len(filas), 2)
+        self.assertEqual(filas[1][1], 'María')
+
+    def test_requiere_login(self):
+        self.client.force_authenticate(None)
+        self.assertIn(self.client.get('/api/socios/exportar/').status_code, (401, 403))
