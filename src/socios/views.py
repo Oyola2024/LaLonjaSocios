@@ -10,6 +10,13 @@ from .serializers import (
     PagoSerializer,
 )
 
+from django.http import HttpResponse
+
+def home(request):
+    return HttpResponse("Inicio")
+
+def ingresos(request):
+    return HttpResponse("Ingresos")
 
 class SocioViewSet(viewsets.ModelViewSet):
     queryset = Socio.objects.all().order_by('apellido', 'nombre')
