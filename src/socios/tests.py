@@ -420,3 +420,10 @@ class PantallaPrincipalTests(TestCase):
         self.assertEqual(respuesta.status_code, 200)
         self.assertContains(respuesta, 'Club La Lonja')
         self.assertContains(respuesta, 'const MONTO_CUOTA = 5000;')
+
+    def test_ficha_del_socio_usa_la_misma_pagina(self):
+        socio = crear_socio()
+        User.objects.create_user('secretaria', password='clave12345', is_staff=True)
+        self.assertEqual(self.client.get(f'/socios/{socio.id}/').status_code, 302)
+        self.client.login(username='secretaria', password='clave12345')
+        self.assertEqual(self.client.get(f'/socios/{socio.id}/').status_code, 200)

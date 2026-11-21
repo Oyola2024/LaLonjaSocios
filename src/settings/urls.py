@@ -24,6 +24,7 @@ from .routers import router
 
 urlpatterns = [
     path('', home, name='home'),
+    path('socios/<int:pk>/', home, name='socio-ficha'),
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

@@ -33,8 +33,8 @@ from .serializers import (
 
 # Solo entra personal del club (usuarios "staff"); si no, pide iniciar sesión
 @staff_member_required
-def home(request):
-    # Pantalla principal: listado de socios
+def home(request, pk=None):
+    # La misma página muestra el listado (/) y la ficha de un socio (/socios/<id>/)
     return render(request, 'home.html', {
         'monto_cuota': settings.MONTO_CUOTA,
         'dia_vencimiento': settings.DIA_VENCIMIENTO,
