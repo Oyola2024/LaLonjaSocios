@@ -41,6 +41,12 @@ def home(request, pk=None):
     })
 
 
+# Ingresos de cada mes (/ingresos/); los datos los trae la API /api/pagos/ingresos/
+@staff_member_required
+def ingresos(request):
+    return render(request, 'ingresos.html')
+
+
 @extend_schema_view(
     list=extend_schema(
         parameters=[

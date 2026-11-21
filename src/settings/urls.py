@@ -18,13 +18,14 @@ from django.contrib import admin
 from django.urls import path, include
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from socios.views import home
+from socios.views import home, ingresos
 
 from .routers import router
 
 urlpatterns = [
     path('', home, name='home'),
     path('socios/<int:pk>/', home, name='socio-ficha'),
+    path('ingresos/', ingresos, name='ingresos'),
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
