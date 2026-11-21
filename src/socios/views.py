@@ -1,8 +1,13 @@
+from decimal import Decimal
 from io import BytesIO
 
 from django.conf import settings
+from django.contrib.admin.views.decorators import staff_member_required
 from django.http import HttpResponse
-from .models import Socio, Pago, hoy, nombre_periodo
+from django.shortcuts import render
+from django.db.models import Count, Q, Sum
+from django.db.models.functions import ExtractMonth
+from .models import Socio, Pago, MESES, hoy, nombre_periodo
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -22,15 +27,18 @@ from .serializers import (
     PagoSerializer,
     PagarSerializer,
     ResumenSerializer,
+    IngresosSerializer,
 )
 
-from django.http import HttpResponse
 
-def home(request):
-    return HttpResponse("Inicio")
-
-def ingresos(request):
-    return HttpResponse("Ingresos")
+# Solo entra personal del club (usuarios "staff"); si no, pide iniciar sesión
+@staff_member_required
+def home(request, pk=None):
+    # La misma página muestra el listado (/) y la ficha de un socio (/socios/<id>/)
+    return render(request, 'home.html', {
+        'monto_cuota': settings.MONTO_CUOTA,
+        'dia_vencimiento': settings.DIA_VENCIMIENTO,
+    })
 
 
 @extend_schema_view(
@@ -207,3 +215,57 @@ class PagoViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['socio', 'mes', 'anio', 'forma_pago']
+
+    @extend_schema(
+        summary="Ingresos de cada mes",
+        description=(
+            "Suma de lo cobrado en cada mes de un año, según la fecha en que se pagó "
+            "(no según la cuota que se pagó). Sin `anio` usa el año actual."
+        ),
+        parameters=[OpenApiParameter('anio', int, description='Año a consultar. Por defecto, el actual.')],
+        responses={200: IngresosSerializer, 400: OpenApiResponse(description="Año inválido")},
+    )
+    @action(detail=False, methods=['get'])
+    def ingresos(self, request):
+        try:
+            anio = int(request.query_params.get('anio', hoy().year))
+        except ValueError:
+            return Response({'anio': ['Indicá un año válido, por ejemplo 2026.']}, status=status.HTTP_400_BAD_REQUEST)
+
+        filas = (
+            Pago.objects.filter(fecha_pago__year=anio)
+            .annotate(mes_cobro=ExtractMonth('fecha_pago'))
+            .values('mes_cobro')
+            .annotate(
+                cantidad=Count('id'),
+                efectivo=Sum('monto', filter=Q(forma_pago='efectivo')),
+                transferencia=Sum('monto', filter=Q(forma_pago='transferencia')),
+            )
+        )
+        por_mes = {fila['mes_cobro']: fila for fila in filas}
+
+        meses = []
+        for numero, nombre in MESES:
+            fila = por_mes.get(numero, {})
+            efectivo = fila.get('efectivo') or Decimal('0')
+            transferencia = fila.get('transferencia') or Decimal('0')
+            meses.append({
+                'mes': numero,
+                'mes_nombre': nombre,
+                'cantidad': fila.get('cantidad', 0),
+                'efectivo': efectivo,
+                'transferencia': transferencia,
+                'total': efectivo + transferencia,
+            })
+
+        anios = {fecha.year for fecha in Pago.objects.dates('fecha_pago', 'year')} | {hoy().year, anio}
+        datos = {
+            'anio': anio,
+            'anios': sorted(anios, reverse=True),
+            'cantidad': sum(m['cantidad'] for m in meses),
+            'efectivo': sum(m['efectivo'] for m in meses),
+            'transferencia': sum(m['transferencia'] for m in meses),
+            'total': sum(m['total'] for m in meses),
+            'meses': meses,
+        }
+        return Response(IngresosSerializer(datos).data)
