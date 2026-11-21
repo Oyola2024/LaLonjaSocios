@@ -8,7 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-stone-100 text-stone-900 text-base min-h-screen flex flex-col">
-    {% url 'home' as url_inicio %}
+    {% url 'home' as url_inicio %}{% url 'ingresos' as url_ingresos %}
 
     <!-- Encabezado (igual en todas las páginas) -->
     <header class="bg-white border-b-4 border-red-600">
@@ -22,7 +22,9 @@
             </a>
             <nav class="order-last flex w-full items-center gap-1 sm:order-none sm:w-auto">
                 <a href="{{ url_inicio }}"
-                   class="flex-1 rounded-lg bg-red-600 px-4 py-2 text-center font-semibold text-white sm:flex-none">Socios</a>
+                   class="flex-1 rounded-lg px-4 py-2 text-center font-semibold sm:flex-none {% if request.path == url_ingresos %}text-stone-700 hover:bg-stone-100{% else %}bg-red-600 text-white{% endif %}">Socios</a>
+                <a href="{{ url_ingresos }}"
+                   class="flex-1 rounded-lg px-4 py-2 text-center font-semibold sm:flex-none {% if request.path == url_ingresos %}bg-red-600 text-white{% else %}text-stone-700 hover:bg-stone-100{% endif %}">Ingresos</a>
                 <a href="{% url 'admin:index' %}" class="hidden sm:inline px-3 py-2 text-stone-600 hover:text-red-600 underline">Administración</a>
             </nav>
             <form method="post" action="{% url 'admin:logout' %}">

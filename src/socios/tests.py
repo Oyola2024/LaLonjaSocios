@@ -401,6 +401,15 @@ class IngresosTests(APITestCase):
         self.client.force_authenticate(None)
         self.assertIn(self.client.get('/api/pagos/ingresos/').status_code, (401, 403))
 
+    def test_pagina_de_ingresos_solo_para_staff(self):
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.get('/ingresos/').status_code, 302)
+        self.client.login(username='secretaria', password='clave12345')
+        respuesta = self.client.get('/ingresos/')
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, 'Ingresos por mes')
+        self.assertContains(respuesta, 'Club La Lonja (C.A.L.L.)')  # pie de base.html
+
 
 class PantallaPrincipalTests(TestCase):
     def test_sin_login_manda_al_ingreso(self):
