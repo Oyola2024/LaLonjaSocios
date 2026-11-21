@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'drf_spectacular',
     'rest_framework',
     'django_filters',
     'socios',
@@ -85,8 +86,16 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+}
+
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'La Lonja API',
+    'DESCRIPTION': 'API para la gestión de socios y cuotas del club',
+    'VERSION': '1.0',
 }
 
 SIMPLE_JWT = {
