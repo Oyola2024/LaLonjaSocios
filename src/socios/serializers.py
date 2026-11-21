@@ -99,3 +99,10 @@ class SocioDetalleSerializer(SocioEstadoSerializer):
 
     class Meta(SocioEstadoSerializer.Meta):
         fields = SocioEstadoSerializer.Meta.fields + ['pagos']
+
+
+class ResumenSerializer(serializers.Serializer):
+    total = serializers.IntegerField()
+    al_dia = serializers.IntegerField()
+    morosos = serializers.IntegerField()
+    inactivos = serializers.IntegerField()
