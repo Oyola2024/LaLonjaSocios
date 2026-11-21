@@ -24,10 +24,14 @@
             La cuota vence el <strong>día {{ dia_vencimiento }} de cada mes</strong>. Después de esa fecha, quien no pagó figura como "Debe cuota".
         </p>
 
-        <!-- Buscador -->
+        <!-- Buscador y botón nuevo socio -->
         <section class="flex flex-col sm:flex-row gap-3 mb-3">
             <input id="buscador" type="search" placeholder="Buscar por nombre, apellido o DNI..."
                    class="flex-1 rounded-lg border border-stone-300 bg-white px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+            <button id="btn-nuevo" type="button"
+                    class="rounded-lg bg-red-600 px-6 py-3 text-lg font-bold text-white shadow hover:bg-red-700">
+                + Nuevo socio
+            </button>
         </section>
 
         <!-- Pestañas -->
@@ -45,6 +49,68 @@
         <nav id="paginacion" class="mt-6 flex items-center justify-center gap-4"></nav>
       </div>
 
+    <!-- Formulario de socio (nuevo / editar) -->
+    <dialog id="dlg-socio" class="w-full max-w-lg rounded-2xl p-0 shadow-2xl backdrop:bg-black/50">
+        <form id="form-socio" class="p-6 space-y-4" novalidate>
+            <h2 id="titulo-socio" class="text-2xl font-extrabold">Nuevo socio</h2>
+            <p id="error-general" class="hidden rounded-lg bg-red-50 px-3 py-2 text-red-800"></p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label class="block">
+                    <span class="font-semibold">Nombre *</span>
+                    <input name="nombre" required maxlength="100" class="campo mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 text-lg">
+                    <span class="error-campo text-sm text-red-700"></span>
+                </label>
+                <label class="block">
+                    <span class="font-semibold">Apellido *</span>
+                    <input name="apellido" required maxlength="100" class="campo mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 text-lg">
+                    <span class="error-campo text-sm text-red-700"></span>
+                </label>
+            </div>
+            <label class="block">
+                <span class="font-semibold">DNI *</span>
+                <input name="dni" required inputmode="numeric" maxlength="8" placeholder="Solo números, sin puntos"
+                       class="campo mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 text-lg">
+                <span class="error-campo text-sm text-red-700"></span>
+            </label>
+            <label class="block">
+                <span class="font-semibold">WhatsApp *</span>
+                <input name="telefono" required inputmode="tel" maxlength="20" placeholder="Ej: 3584123456"
+                       class="campo mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 text-lg">
+                <span class="text-sm text-stone-500">Con código de área y sin el 15.</span>
+                <span class="error-campo block text-sm text-red-700"></span>
+            </label>
+            <label class="block">
+                <span class="font-semibold">Email (opcional)</span>
+                <input name="email" type="email" maxlength="254" class="campo mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 text-lg">
+                <span class="error-campo text-sm text-red-700"></span>
+            </label>
+            <label class="block">
+                <span class="font-semibold">Dirección (opcional)</span>
+                <input name="direccion" maxlength="200" class="campo mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 text-lg">
+                <span class="error-campo text-sm text-red-700"></span>
+            </label>
+            <label class="block">
+                <span class="font-semibold">Fecha de alta</span>
+                <input name="fecha_alta" type="date" required class="campo mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 text-lg">
+                <span class="error-campo text-sm text-red-700"></span>
+            </label>
+
+            <label class="flex items-start gap-3 rounded-lg bg-stone-50 p-3 ring-1 ring-stone-200">
+                <input name="activo" type="checkbox" checked class="mt-1 h-6 w-6 accent-red-600">
+                <span>
+                    <span class="font-semibold">Socio activo</span><br>
+                    <span class="text-sm text-stone-600">Destildalo si el socio se dio de baja pero querés conservar su historial. Los socios inactivos no figuran como deudores.</span>
+                </span>
+            </label>
+
+            <div class="flex justify-end gap-3 pt-2">
+                <button type="button" data-cerrar class="rounded-lg border border-stone-300 px-5 py-3 font-semibold hover:bg-stone-100">Cancelar</button>
+                <button type="submit" id="btn-guardar" class="rounded-lg bg-red-600 px-6 py-3 font-bold text-white hover:bg-red-700">Guardar</button>
+            </div>
+        </form>
+    </dialog>
+
 {% endblock %}
 
 {% block scripts %}
@@ -53,6 +119,7 @@
         const MONTO_CUOTA = {{ monto_cuota|unlocalize }};
 
         const estado = { pagina: 1, filtro: '', texto: '', total: 0, tamano: 20 };
+        let socioActual = null; // socio que se está editando / cobrando / borrando
 
         // ---------- Lista ----------
         function insigniaEstado(s) {
@@ -92,6 +159,7 @@
                     </div>
                     <div class="flex flex-wrap gap-2" data-id="${s.id}">
                         ${whatsapp}
+                        <button type="button" data-accion="editar" class="rounded-lg border border-stone-300 px-4 py-2 font-semibold hover:bg-stone-100">Editar</button>
                     </div>
                 </div>
             </article>`;
@@ -177,6 +245,84 @@
                 estado.pagina = 1;
                 cargarLista();
             }, 300);
+        });
+
+        // ---------- Acciones de cada tarjeta ----------
+        $('lista').addEventListener('click', (e) => {
+            const boton = e.target.closest('button[data-accion]');
+            if (!boton) return;
+            const id = Number(boton.parentElement.dataset.id);
+            socioActual = socios.find((s) => s.id === id);
+            if (!socioActual) return;
+            if (boton.dataset.accion === 'editar') abrirFormulario(socioActual);
+        });
+
+        document.querySelectorAll('[data-cerrar]').forEach((b) =>
+            b.addEventListener('click', () => b.closest('dialog').close()));
+
+        // ---------- Alta y edición ----------
+        const formSocio = $('form-socio');
+
+        function limpiarErrores() {
+            $('error-general').classList.add('hidden');
+            formSocio.querySelectorAll('.error-campo').forEach((s) => { s.textContent = ''; });
+            formSocio.querySelectorAll('.campo').forEach((c) => c.classList.remove('border-red-500'));
+        }
+
+        function abrirFormulario(socio = null) {
+            limpiarErrores();
+            formSocio.reset();
+            $('titulo-socio').textContent = socio ? 'Editar socio' : 'Nuevo socio';
+            for (const nombre of ['nombre', 'apellido', 'dni', 'telefono', 'email', 'direccion', 'fecha_alta']) {
+                formSocio.elements[nombre].value = socio ? (socio[nombre] ?? '') : (nombre === 'fecha_alta' ? hoyIso() : '');
+            }
+            formSocio.elements.activo.checked = socio ? socio.activo : true;
+            if (!socio) socioActual = null;
+            $('dlg-socio').showModal();
+        }
+
+        $('btn-nuevo').addEventListener('click', () => abrirFormulario());
+
+        formSocio.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            limpiarErrores();
+            const cuerpo = {};
+            for (const nombre of ['nombre', 'apellido', 'dni', 'telefono', 'email', 'direccion', 'fecha_alta']) {
+                const valor = formSocio.elements[nombre].value.trim();
+                cuerpo[nombre] = (valor === '' && ['email', 'direccion'].includes(nombre)) ? null : valor;
+            }
+            cuerpo.activo = formSocio.elements.activo.checked;
+            const boton = $('btn-guardar');
+            boton.disabled = true;
+            try {
+                if (socioActual) {
+                    await pedir(`${API}${socioActual.id}/`, { method: 'PUT', body: JSON.stringify(cuerpo) });
+                } else {
+                    await pedir(API, { method: 'POST', body: JSON.stringify(cuerpo) });
+                }
+                $('dlg-socio').close();
+                avisar(socioActual ? 'Datos del socio guardados.' : 'Socio agregado.');
+                actualizarTodo();
+            } catch (error) {
+                let hayErroresDeCampo = false;
+                if (error.datos && typeof error.datos === 'object') {
+                    for (const [campo, mensajes] of Object.entries(error.datos)) {
+                        const input = formSocio.elements[campo];
+                        if (input && Array.isArray(mensajes)) {
+                            input.classList.add('border-red-500');
+                            input.parentElement.querySelector('.error-campo').textContent = mensajes.join(' ');
+                            hayErroresDeCampo = true;
+                        }
+                    }
+                }
+                if (!hayErroresDeCampo) {
+                    const general = $('error-general');
+                    general.textContent = mensajeDeError(error);
+                    general.classList.remove('hidden');
+                }
+            } finally {
+                boton.disabled = false;
+            }
         });
 
         marcarPestana();
