@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Socio, Pago, nombre_periodo
+from .models import Socio, Pago, MESES, FORMAS_DE_PAGO, nombre_periodo
 
 
 class SocioSerializer(serializers.ModelSerializer):
@@ -24,6 +24,7 @@ class SocioSerializer(serializers.ModelSerializer):
         if not 8 <= len(digitos) <= 15:
             raise serializers.ValidationError('Ingresá un teléfono válido, con código de área y sin el 15.')
         return digitos
+
 
 class SocioEstadoSerializer(serializers.ModelSerializer):
     estado = serializers.SerializerMethodField()
@@ -72,6 +73,7 @@ class SocioEstadoSerializer(serializers.ModelSerializer):
         pago = socio.ultimo_pago()
         return pago.fecha_pago.isoformat() if pago else None
 
+
 class PagoSerializer(serializers.ModelSerializer):
     mes_nombre = serializers.CharField(source='get_mes_display', read_only=True)
     forma_pago_nombre = serializers.CharField(source='get_forma_pago_display', read_only=True)
@@ -99,6 +101,20 @@ class SocioDetalleSerializer(SocioEstadoSerializer):
 
     class Meta(SocioEstadoSerializer.Meta):
         fields = SocioEstadoSerializer.Meta.fields + ['pagos']
+
+
+class PagarSerializer(serializers.Serializer):
+    # Todo es opcional: sin datos se registra la próxima cuota que corresponde pagar
+    mes = serializers.ChoiceField(choices=MESES, required=False)
+    anio = serializers.IntegerField(min_value=2000, max_value=2100, required=False)
+    monto = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=0, required=False)
+    fecha_pago = serializers.DateField(required=False)
+    forma_pago = serializers.ChoiceField(choices=FORMAS_DE_PAGO, required=False)
+
+    def validate(self, data):
+        if ('mes' in data) != ('anio' in data):
+            raise serializers.ValidationError('Indicá el mes y el año juntos.')
+        return data
 
 
 class ResumenSerializer(serializers.Serializer):
