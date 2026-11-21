@@ -242,3 +242,72 @@ class SocioApiTests(APITestCase):
         datos = {'socio': socio.id, 'mes': 9, 'anio': 2026, 'monto': '5000'}
         self.assertEqual(self.client.post('/api/pagos/', datos, format='json').status_code, 201)
         self.assertEqual(self.client.post('/api/pagos/', datos, format='json').status_code, 400)
+
+
+class HistorialYSociosInactivosTests(APITestCase):
+    def setUp(self):
+        self.usuario = User.objects.create_user('secretaria', password='clave12345', is_staff=True)
+        self.client.force_authenticate(self.usuario)
+
+    def test_socio_inactivo_no_debe_ni_tiene_link(self):
+        socio = crear_socio(activo=False)
+        with con_fecha(2026, 11, 19):
+            self.assertEqual(socio.meses_adeudados(), [])
+            self.assertIsNone(socio.link_whatsapp())
+            respuesta = self.client.get('/api/socios/')
+        self.assertEqual(respuesta.data['results'][0]['estado'], 'inactivo')
+        self.assertIsNone(respuesta.data['results'][0]['link_whatsapp'])
+
+    def test_inactivo_conserva_su_historial(self):
+        socio = crear_socio()
+        pagar(socio, 2026, 9)
+        respuesta = self.client.patch(f'/api/socios/{socio.id}/', {'activo': False}, format='json')
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(Pago.objects.filter(socio=socio).count(), 1)
+
+    def test_filtro_inactivos_y_resumen(self):
+        crear_socio()
+        crear_socio(dni='20999888', activo=False)
+        with con_fecha(2026, 11, 19):
+            inactivos = self.client.get('/api/socios/?estado=inactivo')
+            morosos = self.client.get('/api/socios/?estado=moroso')
+            resumen = self.client.get('/api/socios/resumen/')
+        self.assertEqual(len(inactivos.data['results']), 1)
+        self.assertEqual(len(morosos.data['results']), 1)
+        self.assertEqual(resumen.data, {'total': 1, 'al_dia': 0, 'morosos': 1, 'inactivos': 1})
+
+    def test_pagar_con_mes_fecha_y_forma_de_pago(self):
+        socio = crear_socio()
+        datos = {'mes': 10, 'anio': 2026, 'fecha_pago': '2026-11-05',
+                 'forma_pago': 'transferencia', 'monto': '10000'}
+        with con_fecha(2026, 11, 19):
+            respuesta = self.client.post(f'/api/socios/{socio.id}/pagar/', datos, format='json')
+        self.assertEqual(respuesta.status_code, 201)
+        pago = Pago.objects.get()
+        self.assertEqual((pago.mes, pago.anio), (10, 2026))
+        self.assertEqual(pago.fecha_pago, date(2026, 11, 5))
+        self.assertEqual(pago.forma_pago, 'transferencia')
+
+    def test_forma_de_pago_invalida(self):
+        socio = crear_socio()
+        respuesta = self.client.post(
+            f'/api/socios/{socio.id}/pagar/', {'forma_pago': 'cheque'}, format='json')
+        self.assertEqual(respuesta.status_code, 400)
+
+    def test_ficha_trae_historial_ordenado(self):
+        socio = crear_socio()
+        pagar(socio, 2026, 9)
+        pagar(socio, 2026, 11)
+        pagar(socio, 2026, 10)
+        respuesta = self.client.get(f'/api/socios/{socio.id}/')
+        pagos = respuesta.data['pagos']
+        self.assertEqual([p['mes'] for p in pagos], [11, 10, 9])
+        self.assertEqual(pagos[0]['mes_nombre'], 'Noviembre')
+        self.assertEqual(pagos[0]['forma_pago_nombre'], 'Efectivo')
+        self.assertIn('proximo_periodo', respuesta.data)
+
+    def test_eliminar_un_pago(self):
+        socio = crear_socio()
+        pago = pagar(socio, 2026, 9)
+        self.assertEqual(self.client.delete(f'/api/pagos/{pago.id}/').status_code, 204)
+        self.assertEqual(Pago.objects.count(), 0)
