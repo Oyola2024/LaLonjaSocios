@@ -9,9 +9,9 @@ admin.site.index_title = "Panel de control del club"
 
 @admin.register(Socio)
 class SocioAdmin(admin.ModelAdmin):
-    list_display = ('apellido', 'nombre', 'dni', 'telefono', 'email', 'fecha_alta')
+    list_display = ('apellido', 'nombre', 'dni', 'telefono', 'email', 'fecha_alta', 'activo')
     search_fields = ('nombre', 'apellido', 'dni', 'telefono')
-    list_filter = ('fecha_alta',)
+    list_filter = ('activo', 'fecha_alta')
     ordering = ('apellido', 'nombre')
 
 

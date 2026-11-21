@@ -40,4 +40,4 @@ class PagoViewSet(viewsets.ModelViewSet):
     serializer_class = PagoSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['socio', 'mes', 'anio']
+    filterset_fields = ['socio', 'mes', 'anio', 'forma_pago']
