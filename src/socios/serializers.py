@@ -128,3 +128,22 @@ class ResumenSerializer(serializers.Serializer):
     al_dia = serializers.IntegerField()
     morosos = serializers.IntegerField()
     inactivos = serializers.IntegerField()
+
+
+class IngresoMesSerializer(serializers.Serializer):
+    mes = serializers.IntegerField()
+    mes_nombre = serializers.CharField()
+    cantidad = serializers.IntegerField()
+    efectivo = serializers.DecimalField(max_digits=12, decimal_places=2)
+    transferencia = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total = serializers.DecimalField(max_digits=12, decimal_places=2)
+
+
+class IngresosSerializer(serializers.Serializer):
+    anio = serializers.IntegerField()
+    anios = serializers.ListField(child=serializers.IntegerField())
+    cantidad = serializers.IntegerField()
+    efectivo = serializers.DecimalField(max_digits=12, decimal_places=2)
+    transferencia = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total = serializers.DecimalField(max_digits=12, decimal_places=2)
+    meses = IngresoMesSerializer(many=True)
