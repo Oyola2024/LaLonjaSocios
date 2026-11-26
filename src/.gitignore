@@ -1,0 +1,11 @@
+src/tailwindcss
+
+db.sqlite3
+*.sqlite3
+backups/
+staticfiles/
+build/
+dist/
+*.spec
+secret.key
+/tailwindcss

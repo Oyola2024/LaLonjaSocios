@@ -18,8 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from socios.views import home, ingresos
-
+from socios.views import home, ingresos, descargar_backup
 from .routers import router
 
 urlpatterns = [
@@ -33,4 +32,5 @@ urlpatterns = [
     path('api/docs/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('backup/descargar/', descargar_backup, name='descargar_backup'),
 ]

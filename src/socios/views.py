@@ -18,7 +18,9 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiResponse
-
+from django.http import FileResponse
+from django.views.decorators.http import require_POST
+from .backups import hacer_backup
 
 from .serializers import (
     SocioSerializer,
@@ -29,6 +31,12 @@ from .serializers import (
     ResumenSerializer,
     IngresosSerializer,
 )
+
+@staff_member_required
+@require_POST
+def descargar_backup(request):
+    ruta = hacer_backup()
+    return FileResponse(open(ruta, 'rb'), as_attachment=True, filename=ruta.name)
 
 
 # Solo entra personal del club (usuarios "staff"); si no, pide iniciar sesión

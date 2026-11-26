@@ -12,6 +12,17 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
+import os
+from pathlib import Path
+import sys
+# Cuando corre empaquetado como .exe
+if getattr(sys, 'frozen', False):
+    BASE_DIR = Path(sys._MEIPASS)   # donde PyInstaller deja templates y estáticos
+    DEBUG = False
+    ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
+    SECRET_KEY = _clave_secreta()
+    STATIC_ROOT = BASE_DIR / 'staticfiles'
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -47,6 +58,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -155,3 +167,25 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
+
+
+
+DATA_DIR = Path(os.environ.get('LALONJA_DATA_DIR', BASE_DIR))
+DATABASES = {'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': DATA_DIR / 'db.sqlite3'}}
+
+BACKUP_DIR = DATA_DIR / 'backups'
+BACKUP_CONSERVAR = 30
+BACKUP_EXTRA_DIR = os.environ.get('LALONJA_BACKUP_EXTRA')  # ej: D:\ o carpeta de Drive
+
+
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+def _clave_secreta():
+    archivo = DATA_DIR / 'secret.key'
+    if archivo.exists():
+        return archivo.read_text().strip()
+    from django.core.management.utils import get_random_secret_key
+    clave = get_random_secret_key()
+    archivo.write_text(clave)
+    return clave
+
