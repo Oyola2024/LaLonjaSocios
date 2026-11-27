@@ -367,3 +367,5 @@ Pantalla (home.html, listado en `/` y ficha en `/socios/<id>/`) → API (/api/so
 ## 👥 Autor
 
 - Facundo Oyola
+- Mateo Torres
+- Fransisco Elisondo
